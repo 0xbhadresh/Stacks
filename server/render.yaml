@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: andar-bahar-backend
+    env: node
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
+    envVars:
+      - key: MONGODB_URI
+        value: mongodb+srv://bhadresh:Bhadresh984@stacks.wgww0iq.mongodb.net/
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    healthCheckPath: /health 

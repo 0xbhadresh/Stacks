@@ -1,17 +1,40 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { GameCard } from "@/components/game-card"
 import { Share2, RotateCcw, Trophy } from "lucide-react"
 import type { GameData } from "@/app/page"
+import { useUserStats } from "@/hooks/use-user-stats"
 
 interface ResultsPageProps {
   gameData: GameData
   onPlayAgain: () => void
   onShowLeaderboard: () => void
+  currentFid?: string | null
 }
 
-export function ResultsPage({ gameData, onPlayAgain, onShowLeaderboard }: ResultsPageProps) {
+export function ResultsPage({ gameData, onPlayAgain, onShowLeaderboard, currentFid }: ResultsPageProps) {
+  const { stats, loading, updateStats } = useUserStats(currentFid || null);
+  const hasUpdatedStatsRef = useRef(false);
+
+  // Update stats when game completes (only once per game)
+  useEffect(() => {
+    if (gameData.playerWon !== null && gameData.betSide && gameData.betAmount && !hasUpdatedStatsRef.current) {
+      hasUpdatedStatsRef.current = true;
+      updateStats({
+        won: gameData.playerWon,
+        amount: gameData.betAmount,
+        payout: gameData.payout
+      });
+    }
+  }, [gameData.playerWon, gameData.betSide, gameData.betAmount, gameData.payout, updateStats]);
+
+  // Reset the flag when game data changes (new game)
+  useEffect(() => {
+    hasUpdatedStatsRef.current = false;
+  }, [gameData.jokerCard?.id]); // Reset when joker card changes (new game)
+
   const handleShare = () => {
     const message = gameData.playerWon
       ? `🎉 Won ${gameData.payout} chips in Andar Bahar! Join the game!`
@@ -36,14 +59,39 @@ export function ResultsPage({ gameData, onPlayAgain, onShowLeaderboard }: Result
     <div className="h-full flex flex-col p-4">
       {/* Result Header */}
       <div className="text-center mb-4">
-        <div className="text-4xl mb-2">{gameData.playerWon ? "🎉" : "💀"}</div>
-        <h1 className={`text-2xl font-black mb-2 ${gameData.playerWon ? "text-white" : "text-gray-400"}`}>
-          {gameData.playerWon ? "YOU WON!" : "GAME OVER!"}
-        </h1>
-        {gameData.playerWon && (
-          <div className="text-xl font-black text-white border-2 border-white px-3 py-1 inline-block">
-            +{gameData.payout} CHIPS
-          </div>
+        {gameData.playerWon === null ? (
+          // No bet placed
+          <>
+            <div className="text-4xl mb-2">🎲</div>
+            <h1 className="text-2xl font-black mb-2 text-gray-400">
+              GAME FINISHED
+            </h1>
+            <div className="text-sm text-gray-500">
+              You didn't place a bet this round
+            </div>
+          </>
+        ) : gameData.playerWon ? (
+          // Player won
+          <>
+            <div className="text-4xl mb-2">🎉</div>
+            <h1 className="text-2xl font-black mb-2 text-white">
+              WINNER
+            </h1>
+            <div className="text-xl font-black text-white border-2 border-white px-3 py-1 inline-block">
+              +{gameData.payout} CHIPS
+            </div>
+          </>
+        ) : (
+          // Player lost
+          <>
+            <div className="text-4xl mb-2">💀</div>
+            <h1 className="text-2xl font-black mb-2 text-gray-400">
+              LOSS
+            </h1>
+            <div className="text-sm text-gray-500">
+              Better luck next time!
+            </div>
+          </>
         )}
       </div>
 
@@ -77,43 +125,41 @@ export function ResultsPage({ gameData, onPlayAgain, onShowLeaderboard }: Result
       </div>
 
       {/* Cards Drawn - Redesigned like screenshot */}
-      <div className="bg-gray-900 border-2 border-white rounded-lg p-3 mb-3 flex-1 min-h-0 flex flex-col">
-        <h3 className="text-xs font-black text-white mb-3 text-center flex-shrink-0">CARDS DRAWN</h3>
+      <div className="bg-gray-900 border-2 border-white rounded-lg p-3 mb-3">
+        <h3 className="text-xs font-black text-white mb-3 text-center">CARDS DRAWN</h3>
 
-        <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0">
-          <div className="grid grid-cols-2 gap-3">
-            {/* Andar Column */}
-            <div className="space-y-2">
-              <div className="text-xs font-black text-white text-center">ANDAR</div>
-              <div className="space-y-1">
-                {andarCards.map((card) => (
-                  <div key={`andar-${card.order}`} className="flex items-center gap-2 bg-gray-800 rounded p-1">
-                    <span className="text-xs text-gray-400 w-6">#{card.order}</span>
-                    <GameCard card={card} size="xs" isMatching={card.isMatching} />
-                    <span className="text-xs text-white font-bold flex-1">
-                      {card.rank}
-                      {card.suit}
-                    </span>
-                  </div>
-                ))}
-              </div>
+        <div className="grid grid-cols-2 gap-3">
+          {/* Andar Column */}
+          <div className="space-y-2">
+            <div className="text-xs font-black text-white text-center">ANDAR</div>
+            <div className="space-y-1">
+              {andarCards.map((card) => (
+                <div key={`andar-${card.order}`} className="flex items-center gap-2 bg-gray-800 rounded p-1">
+                  <span className="text-xs text-gray-400 w-6">#{card.order}</span>
+                  <GameCard card={card} size="xs" isMatching={card.isMatching} />
+                  <span className="text-xs text-white font-bold flex-1">
+                    {card.rank}
+                    {card.suit}
+                  </span>
+                </div>
+              ))}
             </div>
+          </div>
 
-            {/* Bahar Column */}
-            <div className="space-y-2">
-              <div className="text-xs font-black text-white text-center">BAHAR</div>
-              <div className="space-y-1">
-                {baharCards.map((card) => (
-                  <div key={`bahar-${card.order}`} className="flex items-center gap-2 bg-gray-800 rounded p-1">
-                    <span className="text-xs text-gray-400 w-6">#{card.order}</span>
-                    <GameCard card={card} size="xs" isMatching={card.isMatching} />
-                    <span className="text-xs text-white font-bold flex-1">
-                      {card.rank}
-                      {card.suit}
-                    </span>
-                  </div>
-                ))}
-              </div>
+          {/* Bahar Column */}
+          <div className="space-y-2">
+            <div className="text-xs font-black text-white text-center">BAHAR</div>
+            <div className="space-y-1">
+              {baharCards.map((card) => (
+                <div key={`bahar-${card.order}`} className="flex items-center gap-2 bg-gray-800 rounded p-1">
+                  <span className="text-xs text-gray-400 w-6">#{card.order}</span>
+                  <GameCard card={card} size="xs" isMatching={card.isMatching} />
+                  <span className="text-xs text-white font-bold flex-1">
+                    {card.rank}
+                    {card.suit}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -151,20 +197,50 @@ export function ResultsPage({ gameData, onPlayAgain, onShowLeaderboard }: Result
         <div className="bg-gray-800 border border-gray-600 rounded-lg p-2">
           <div className="grid grid-cols-4 gap-2 text-center">
             <div>
-              <div className="text-sm font-black text-white">18</div>
+              <div className="text-sm font-black text-white">
+                {loading ? "..." : (stats?.gamesPlayed || 0)}
+              </div>
               <div className="text-xs text-gray-400">GAMES</div>
             </div>
             <div>
-              <div className="text-sm font-black text-white">12</div>
+              <div className="text-sm font-black text-white">
+                {loading ? "..." : (stats?.wins || 0)}
+              </div>
               <div className="text-xs text-gray-400">WINS</div>
             </div>
             <div>
-              <div className="text-sm font-black text-white">1,850</div>
+              <div className="text-sm font-black text-white">
+                {loading ? "..." : (stats?.chips || 0).toLocaleString()}
+              </div>
               <div className="text-xs text-gray-400">CHIPS</div>
             </div>
             <div>
-              <div className="text-sm font-black text-white">4</div>
+              <div className="text-sm font-black text-white">
+                {loading ? "..." : (stats?.currentStreak || 0)}
+              </div>
               <div className="text-xs text-gray-400">STREAK</div>
+            </div>
+          </div>
+          
+          {/* Additional stats row */}
+          <div className="grid grid-cols-3 gap-2 text-center mt-2 pt-2 border-t border-gray-700">
+            <div>
+              <div className="text-xs font-black text-white">
+                {loading ? "..." : `${stats?.winRate || 0}%`}
+              </div>
+              <div className="text-xs text-gray-400">WIN RATE</div>
+            </div>
+            <div>
+              <div className="text-xs font-black text-green-400">
+                {loading ? "..." : `+${(stats?.totalEarned || 0).toLocaleString()}`}
+              </div>
+              <div className="text-xs text-gray-400">EARNED</div>
+            </div>
+            <div>
+              <div className="text-xs font-black text-red-400">
+                {loading ? "..." : `-${(stats?.totalLost || 0).toLocaleString()}`}
+              </div>
+              <div className="text-xs text-gray-400">LOST</div>
             </div>
           </div>
         </div>

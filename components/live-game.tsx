@@ -7,6 +7,9 @@ import type { GameData, DrawnCard, Card as CardType } from "@/app/page"
 interface LiveGameProps {
   gameData: GameData
   onGameComplete: (winner: "andar" | "bahar", drawnCards: DrawnCard[], matchingCard: CardType) => void
+  externalDrawnCards?: DrawnCard[]
+  externalCurrentSide?: "andar" | "bahar"
+  externalIsDrawing?: boolean
 }
 
 const suits: Array<"♠" | "♥" | "♦" | "♣"> = ["♠", "♥", "♦", "♣"]
@@ -19,12 +22,19 @@ const generateCard = (): CardType => {
   return { suit, rank, color, id: `${rank}${suit}` }
 }
 
-export function LiveGame({ gameData, onGameComplete }: LiveGameProps) {
+export function LiveGame({ gameData, onGameComplete, externalDrawnCards, externalCurrentSide, externalIsDrawing }: LiveGameProps) {
   const [drawnCards, setDrawnCards] = useState<DrawnCard[]>([])
   const [currentSide, setCurrentSide] = useState<"andar" | "bahar">("andar")
   const [isDrawing, setIsDrawing] = useState(true)
 
+  // Prefer external server state if server indicates drawing or has cards
+  const usingExternal = Boolean(externalIsDrawing) || Array.isArray(externalDrawnCards)
+  const renderDrawnCards = usingExternal ? (externalDrawnCards || []) : drawnCards
+  const renderCurrentSide = usingExternal ? (externalCurrentSide ?? currentSide) : currentSide
+  const renderIsDrawing = usingExternal ? Boolean(externalIsDrawing) : isDrawing
+
   useEffect(() => {
+    if (usingExternal) return
     if (!isDrawing) return
 
     const drawCard = () => {
@@ -53,23 +63,29 @@ export function LiveGame({ gameData, onGameComplete }: LiveGameProps) {
 
     const timer = setTimeout(drawCard, 1500)
     return () => clearTimeout(timer)
-  }, [drawnCards, currentSide, isDrawing, gameData.jokerCard.rank, onGameComplete])
+  }, [usingExternal, drawnCards, currentSide, isDrawing, gameData.jokerCard.rank, onGameComplete])
 
-  const andarCards = drawnCards.filter((card) => card.side === "andar")
-  const baharCards = drawnCards.filter((card) => card.side === "bahar")
-  const matchingCard = drawnCards.find((card) => card.isMatching)
+  const andarCards = renderDrawnCards.filter((card) => card.side === "andar")
+  const baharCards = renderDrawnCards.filter((card) => card.side === "bahar")
+  const matchingCard = renderDrawnCards.find((card) => card.isMatching)
+
+  const hasPlayerBet = Boolean(gameData.betSide)
 
   return (
     <div className="h-full flex flex-col p-4">
       {/* Header */}
       <div className="text-center mb-4">
         <h1 className="text-xl font-black text-white mb-2">LIVE GAME</h1>
+        {hasPlayerBet ? (
         <p className="text-xs text-gray-400">
           YOUR BET:{" "}
           <span className="text-white font-bold">
             {gameData.betAmount} ON {gameData.betSide?.toUpperCase()}
           </span>
         </p>
+        ) : (
+          <p className="text-xs text-gray-400">NO BET PLACED</p>
+        )}
       </div>
 
       {/* Deck and Joker */}
@@ -90,14 +106,14 @@ export function LiveGame({ gameData, onGameComplete }: LiveGameProps) {
         <div className="flex flex-col min-h-0">
           <div
             className={`p-2 text-center border-2 rounded-lg mb-3 transition-all duration-500 ${
-              currentSide === "andar" && isDrawing
+              renderCurrentSide === "andar" && renderIsDrawing
                 ? "bg-white text-black border-black shadow-lg"
                 : "bg-gray-900 text-white border-white"
             }`}
           >
             <h3 className="font-black text-sm">ANDAR</h3>
             <p className="text-xs opacity-75">LEFT</p>
-            {currentSide === "andar" && isDrawing && (
+            {renderCurrentSide === "andar" && renderIsDrawing && (
               <div className="mt-1">
                 <div className="w-2 h-2 bg-black rounded-full mx-auto animate-pulse" />
               </div>
@@ -126,14 +142,14 @@ export function LiveGame({ gameData, onGameComplete }: LiveGameProps) {
         <div className="flex flex-col min-h-0">
           <div
             className={`p-2 text-center border-2 rounded-lg mb-3 transition-all duration-500 ${
-              currentSide === "bahar" && isDrawing
+              renderCurrentSide === "bahar" && renderIsDrawing
                 ? "bg-white text-black border-black shadow-lg"
                 : "bg-gray-900 text-white border-white"
             }`}
           >
             <h3 className="font-black text-sm">BAHAR</h3>
             <p className="text-xs opacity-75">RIGHT</p>
-            {currentSide === "bahar" && isDrawing && (
+            {renderCurrentSide === "bahar" && renderIsDrawing && (
               <div className="mt-1">
                 <div className="w-2 h-2 bg-black rounded-full mx-auto animate-pulse" />
               </div>
@@ -161,9 +177,9 @@ export function LiveGame({ gameData, onGameComplete }: LiveGameProps) {
 
       {/* Status */}
       <div className="bg-gray-900 border-2 border-white rounded-lg p-3 text-center">
-        {isDrawing ? (
+        {renderIsDrawing ? (
           <>
-            <div className="text-white font-black text-sm mb-2">DRAWING ON {currentSide.toUpperCase()}...</div>
+            <div className="text-white font-black text-sm mb-2">DRAWING ON {renderCurrentSide.toUpperCase()}...</div>
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
           </>
         ) : (
