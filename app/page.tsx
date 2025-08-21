@@ -51,8 +51,8 @@ export default function AndarBaharGame() {
     } 
   })
 
-  const { gameState: serverGameState, placeBet, isConnected, lobbyDuration, fid, serverChips } = useGameSocket()
-  const { isMiniApp, user, currentFid, chips, isFarcasterUser } = useFarcasterMiniApp()
+  const { gameState: serverGameState, placeBet, isConnected, lobbyDuration, fid } = useGameSocket()
+  const { user, currentFid, isFarcasterUser } = useFarcasterMiniApp()
 
   // Set socket FID when Farcaster hook is ready
   useEffect(() => {
@@ -72,7 +72,7 @@ export default function AndarBaharGame() {
     if (isFarcasterUser && user) {
       import('@/services/socket').then(m => { 
         try { 
-          m.socketService.sendFarcasterUser(user as any)
+          m.socketService.sendFarcasterUser(user as { fid: number; username?: string; displayName?: string; pfpUrl?: string; bio?: string; location?: { placeId: string; description: string } })
         } catch (e) {
           console.log('❌ Main: Failed to send user to server:', e)
         } 
@@ -168,11 +168,6 @@ export default function AndarBaharGame() {
 
   // Display FID with priority: Farcaster user > Socket FID > Current FID
   const displayFid = user?.fid ? String(user.fid) : (fid ?? currentFid ?? '')
-  const pfp = user?.pfpUrl || "/vercel.svg"
-  const userType = isFarcasterUser ? "Farcaster" : "Browser"
-  
-  // Use server chips as primary source of truth, fallback to Farcaster hook chips
-  const displayChips = serverChips !== null ? serverChips : chips
 
   return (
     <div className="h-screen bg-black text-white font-mono overflow-hidden">

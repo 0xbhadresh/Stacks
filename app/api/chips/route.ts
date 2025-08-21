@@ -1,8 +1,14 @@
 import { NextRequest } from 'next/server'
 import { getCollections } from '@/lib/mongo'
 
+interface ChipsRequestBody {
+  fid?: string | number
+  amount?: string | number
+  op?: string
+}
+
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({})) as any
+  const body = await req.json().catch(() => ({})) as ChipsRequestBody
   const fid = String(body.fid || '')
   const amount = Number(body.amount || 0)
   const op = String(body.op || '') // 'add' | 'sub'

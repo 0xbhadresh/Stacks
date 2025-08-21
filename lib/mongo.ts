@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection } from 'mongodb'
+import { MongoClient, Db, Collection, Document } from 'mongodb'
 
 const uri = process.env.MONGODB_URI || ''
 
@@ -16,9 +16,9 @@ export async function getDb() {
 
 export async function getCollections() {
   const database = await getDb()
-  const users = database.collection('users') as Collection<any>
-  const ledger = database.collection('ledger') as Collection<any>
-  const games = database.collection('games') as Collection<any>
-  const bets = database.collection('bets') as Collection<any>
+  const users = database.collection('users') as Collection<Document>
+  const ledger = database.collection('ledger') as Collection<Document>
+  const games = database.collection('games') as Collection<Document>
+  const bets = database.collection('bets') as Collection<Document>
   return { users, ledger, games, bets }
 } 

@@ -1,40 +1,6 @@
 const http = require('http')
 const { Server } = require('socket.io')
-const { MongoClient } = require('mongodb')
-
-// MongoDB Configuration
-const uri = process.env.MONGODB_URI || 'mongodb+srv://bhadresh:Bhadresh984@stacks.wgww0iq.mongodb.net/'
-
-let client
-let db
-let collections = {}
-
-async function connect() {
-  if (db) return { db, collections }
-  client = new MongoClient(uri, { serverSelectionTimeoutMS: 5000 })
-  await client.connect()
-  db = client.db('stacks')
-  collections.users = db.collection('users')
-  collections.games = db.collection('games')
-  collections.bets = db.collection('bets')
-  collections.ledger = db.collection('ledger')
-  collections.game_sessions = db.collection('game_sessions')
-  await Promise.all([
-    collections.users.createIndex({ fid: 1 }, { unique: true }),
-    collections.bets.createIndex({ gameNumber: 1 }),
-    collections.games.createIndex({ gameNumber: 1 }, { unique: true }),
-    collections.ledger.createIndex({ fid: 1, createdAt: -1 }),
-    collections.game_sessions.createIndex({ 'players.fid': 1, createdAt: -1 }),
-    collections.game_sessions.createIndex({ gameNumber: 1 }),
-  ])
-  return { db, collections }
-}
-
-async function close() {
-  if (client) await client.close()
-  db = null
-  collections = {}
-}
+const { connect } = require('./db')
 
 const httpServer = http.createServer()
 
@@ -50,12 +16,6 @@ httpServer.on('request', async (req, res) => {
     const url = new URL(req.url || '/', 'http://localhost')
     const path = url.pathname
     const { collections } = await connect()
-
-    if (req.method === 'GET' && path === '/health') {
-      res.setHeader('Content-Type', 'application/json')
-      res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }))
-      return
-    }
 
     if (req.method === 'GET' && path === '/api/user') {
       const fid = url.searchParams.get('fid')
@@ -239,6 +199,12 @@ httpServer.on('request', async (req, res) => {
         console.error('❌ Server: Error updating user stats:', error)
         res.statusCode = 500; res.end(JSON.stringify({ error: 'internal server error' })); return
       }
+    }
+
+    if (req.method === 'GET' && path === '/health') {
+      res.statusCode = 200
+      res.end('OK')
+      return
     }
 
     if (req.method === 'GET' && path === '/api/leaderboard') {
@@ -787,7 +753,6 @@ io.on('connection', async (socket) => {
 })
 
 const PORT = process.env.PORT || 3001
-
 httpServer.listen(PORT, () => {
   console.log(`Socket.IO server listening on port ${PORT}`)
   startLobbyTimer()

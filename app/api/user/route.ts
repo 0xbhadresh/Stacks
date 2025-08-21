@@ -1,6 +1,15 @@
 import { NextRequest } from 'next/server'
 import { getCollections } from '@/lib/mongo'
 
+interface UserRequestBody {
+  fid?: string | number
+  username?: string
+  displayName?: string
+  pfpUrl?: string
+  bio?: string
+  location?: string
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const fid = searchParams.get('fid')
@@ -12,7 +21,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({})) as any
+  const body = await req.json().catch(() => ({})) as UserRequestBody
   const fid = String(body.fid || '')
   if (!fid) return new Response(JSON.stringify({ error: 'fid required' }), { status: 400 })
   const { users } = await getCollections()

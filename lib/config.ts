@@ -28,7 +28,7 @@ export const config: AppConfig = {
   appUrl: defaultAppUrl,
   socketUrl:
     process.env.NEXT_PUBLIC_SOCKET_URL ||
-    (process.env.NODE_ENV === 'production' ? 'wss://your-server.com' : 'ws://localhost:3001'),
+    (process.env.NODE_ENV === 'production' ? 'wss://webstacks.zeabur.app' : 'ws://localhost:3001'),
   farcaster: {
     enabled: (process.env.NEXT_PUBLIC_FARCASTER_ENABLED || 'true') === 'true',
     embed: {

@@ -67,7 +67,7 @@ export function ResultsPage({ gameData, onPlayAgain, onShowLeaderboard, currentF
               GAME FINISHED
             </h1>
             <div className="text-sm text-gray-500">
-              You didn't place a bet this round
+              You didn&apos;t place a bet this round
             </div>
           </>
         ) : gameData.playerWon ? (

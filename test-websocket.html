@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test - Stacks Backend</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .connected { background-color: #4CAF50; }
+        .disconnected { background-color: #f44336; }
+        .connecting { background-color: #ff9800; }
+        .error { background-color: #f44336; }
+        .success { background-color: #4CAF50; }
+        .info { background-color: #2196F3; }
+        .log {
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #45a049; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border-radius: 3px;
+            border: 1px solid #444;
+            background-color: #333;
+            color: white;
+        }
+        .url-input {
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔌 WebSocket Connection Test</h1>
+    
+    <div>
+        <label for="wsUrl">WebSocket URL:</label>
+        <input type="text" id="wsUrl" class="url-input" value="wss://webstacks.zeabur.app/socket.io/">
+        <button onclick="testUrl()">Test URL</button>
+    </div>
+    
+    <div id="status" class="status disconnected">Disconnected</div>
+    
+    <div>
+        <button id="connectBtn" onclick="connect()">Connect</button>
+        <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+        <button id="testBtn" onclick="testConnection()" disabled>Test Message</button>
+        <button id="clearBtn" onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div>
+        <input type="text" id="messageInput" placeholder="Enter test message" value="Hello from frontend!">
+        <button id="sendBtn" onclick="sendMessage()" disabled>Send Message</button>
+    </div>
+    
+    <div>
+        <h3>Connection Log:</h3>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let socket = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 3;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span style="color: #888;">[${timestamp}]</span> <span class="${type}">${message}</span>`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(status, className) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = status;
+            statusDiv.className = `status ${className}`;
+        }
+
+        function updateButtons(connected) {
+            document.getElementById('connectBtn').disabled = connected;
+            document.getElementById('disconnectBtn').disabled = !connected;
+            document.getElementById('testBtn').disabled = !connected;
+            document.getElementById('sendBtn').disabled = !connected;
+        }
+
+        async function testUrl() {
+            const url = document.getElementById('wsUrl').value;
+            log(`🔍 Testing URL: ${url}`, 'info');
+            
+            // Test HTTP/HTTPS endpoint first
+            const httpUrl = url.replace(/^ws/, 'http').replace(/^wss/, 'https');
+            try {
+                const response = await fetch(httpUrl);
+                log(`✅ HTTP endpoint accessible: ${response.status} ${response.statusText}`, 'success');
+            } catch (error) {
+                log(`❌ HTTP endpoint failed: ${error.message}`, 'error');
+            }
+        }
+
+        function connect() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                log('Already connected!', 'info');
+                return;
+            }
+
+            const wsUrl = document.getElementById('wsUrl').value;
+            updateStatus('Connecting...', 'connecting');
+            log(`Attempting to connect to ${wsUrl}...`, 'info');
+
+            try {
+                socket = new WebSocket(wsUrl);
+
+                socket.onopen = function(event) {
+                    updateStatus('Connected!', 'connected');
+                    updateButtons(true);
+                    reconnectAttempts = 0;
+                    log('✅ WebSocket connection established successfully!', 'success');
+                    log('Connection details: ' + JSON.stringify(event), 'info');
+                };
+
+                socket.onmessage = function(event) {
+                    log('📨 Received: ' + event.data, 'success');
+                    try {
+                        const data = JSON.parse(event.data);
+                        log('Parsed data: ' + JSON.stringify(data, null, 2), 'info');
+                    } catch (e) {
+                        log('Raw message (not JSON): ' + event.data, 'info');
+                    }
+                };
+
+                socket.onclose = function(event) {
+                    updateStatus('Disconnected', 'disconnected');
+                    updateButtons(false);
+                    log('❌ WebSocket connection closed. Code: ' + event.code + ', Reason: ' + event.reason, 'error');
+                    
+                    if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        log(`🔄 Attempting to reconnect... (${reconnectAttempts}/${maxReconnectAttempts})`, 'info');
+                        setTimeout(connect, 2000);
+                    }
+                };
+
+                socket.onerror = function(error) {
+                    updateStatus('Connection Error', 'error');
+                    log('❌ WebSocket error: ' + error, 'error');
+                    console.error('WebSocket error details:', error);
+                };
+
+            } catch (error) {
+                updateStatus('Connection Failed', 'error');
+                log('❌ Failed to create WebSocket connection: ' + error.message, 'error');
+            }
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.close(1000, 'User initiated disconnect');
+                socket = null;
+                updateStatus('Disconnected', 'disconnected');
+                updateButtons(false);
+                log('🔌 Disconnected by user', 'info');
+            }
+        }
+
+        function sendMessage() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                const message = document.getElementById('messageInput').value;
+                socket.send(message);
+                log('📤 Sent: ' + message, 'success');
+            } else {
+                log('❌ Cannot send message - not connected', 'error');
+            }
+        }
+
+        function testConnection() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                // Send a test message
+                const testMessage = {
+                    type: 'test',
+                    timestamp: new Date().toISOString(),
+                    message: 'Hello from WebSocket test!'
+                };
+                socket.send(JSON.stringify(testMessage));
+                log('🧪 Sent test message: ' + JSON.stringify(testMessage), 'success');
+            } else {
+                log('❌ Cannot send test message - not connected', 'error');
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Auto-connect on page load
+        window.onload = function() {
+            log('🚀 WebSocket test page loaded', 'info');
+            log('Click "Connect" to test the connection to wss://webstacks.zeabur.app', 'info');
+        };
+    </script>
+</body>
+</html> 

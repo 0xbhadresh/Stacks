@@ -4,10 +4,21 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Trophy, Medal, Crown, RefreshCw } from "lucide-react"
 import { useLeaderboard, type LeaderboardType } from "@/hooks/use-leaderboard"
+import Image from "next/image"
 
 interface LeaderboardProps {
   onBackToLobby: () => void
   currentFid?: string | null
+}
+
+interface Player {
+  fid: string
+  username: string
+  chips: number
+  wins: number
+  winRate: number
+  maxStreak: number
+  gamesPlayed: number
 }
 
 export function Leaderboard({ onBackToLobby, currentFid }: LeaderboardProps) {
@@ -38,7 +49,7 @@ export function Leaderboard({ onBackToLobby, currentFid }: LeaderboardProps) {
     }
   }
 
-  const getPlayerValue = (player: any, type: LeaderboardType) => {
+  const getPlayerValue = (player: Player, type: LeaderboardType) => {
     switch (type) {
       case 'chips': return (player.chips || 0).toLocaleString()
       case 'wins': return (player.wins || 0).toString()
@@ -47,7 +58,7 @@ export function Leaderboard({ onBackToLobby, currentFid }: LeaderboardProps) {
     }
   }
 
-  const getPlayerSubValue = (player: any, type: LeaderboardType) => {
+  const getPlayerSubValue = (player: Player, type: LeaderboardType) => {
     switch (type) {
       case 'chips': return `${player.wins || 0} WINS • 🔥 ${player.maxStreak || 0}`
       case 'wins': return `${player.gamesPlayed || 0} GAMES • ${player.winRate || 0}%`
@@ -57,7 +68,6 @@ export function Leaderboard({ onBackToLobby, currentFid }: LeaderboardProps) {
   }
 
   const top3Players = players.slice(0, 3)
-  const otherPlayers = players.slice(3)
 
   return (
     <div className="h-full flex flex-col p-4">
@@ -165,9 +175,11 @@ export function Leaderboard({ onBackToLobby, currentFid }: LeaderboardProps) {
                       {getRankIcon(rank)}
                       <div className="flex items-center gap-2">
                         {player.pfpUrl && (
-                          <img 
+                          <Image 
                             src={player.pfpUrl} 
                             alt="avatar" 
+                            width={24}
+                            height={24}
                             className="w-6 h-6 rounded-full border border-gray-600"
                           />
                         )}

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO Test - Stacks Backend</title>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .connected { background-color: #4CAF50; }
+        .disconnected { background-color: #f44336; }
+        .connecting { background-color: #ff9800; }
+        .error { background-color: #f44336; }
+        .success { background-color: #4CAF50; }
+        .info { background-color: #2196F3; }
+        .log {
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #45a049; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border-radius: 3px;
+            border: 1px solid #444;
+            background-color: #333;
+            color: white;
+        }
+        .url-input {
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔌 Socket.IO Connection Test</h1>
+    
+    <div>
+        <label for="serverUrl">Server URL:</label>
+        <input type="text" id="serverUrl" class="url-input" value="https://webstacks.zeabur.app">
+        <button onclick="testUrl()">Test URL</button>
+    </div>
+    
+    <div>
+        <label for="fidInput">FID (required):</label>
+        <input type="text" id="fidInput" value="12345" placeholder="Enter FID">
+    </div>
+    
+    <div id="status" class="status disconnected">Disconnected</div>
+    
+    <div>
+        <button id="connectBtn" onclick="connect()">Connect</button>
+        <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+        <button id="testBtn" onclick="testConnection()" disabled>Test Message</button>
+        <button id="clearBtn" onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div>
+        <input type="text" id="messageInput" placeholder="Enter test message" value="Hello from Socket.IO test!">
+        <button id="sendBtn" onclick="sendMessage()" disabled>Send Message</button>
+    </div>
+    
+    <div>
+        <h3>Connection Log:</h3>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let socket = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span style="color: #888;">[${timestamp}]</span> <span class="${type}">${message}</span>`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(status, className) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = status;
+            statusDiv.className = `status ${className}`;
+        }
+
+        function updateButtons(connected) {
+            document.getElementById('connectBtn').disabled = connected;
+            document.getElementById('disconnectBtn').disabled = !connected;
+            document.getElementById('testBtn').disabled = !connected;
+            document.getElementById('sendBtn').disabled = !connected;
+        }
+
+        async function testUrl() {
+            const url = document.getElementById('serverUrl').value;
+            log(`🔍 Testing URL: ${url}`, 'info');
+            
+            try {
+                const response = await fetch(url);
+                log(`✅ HTTP endpoint accessible: ${response.status} ${response.statusText}`, 'success');
+            } catch (error) {
+                log(`❌ HTTP endpoint failed: ${error.message}`, 'error');
+            }
+        }
+
+        function connect() {
+            if (socket && socket.connected) {
+                log('Already connected!', 'info');
+                return;
+            }
+
+            const serverUrl = document.getElementById('serverUrl').value;
+            const fid = document.getElementById('fidInput').value;
+            
+            if (!fid) {
+                log('❌ FID is required for connection', 'error');
+                return;
+            }
+
+            updateStatus('Connecting...', 'connecting');
+            log(`Attempting to connect to ${serverUrl} with FID: ${fid}...`, 'info');
+
+            try {
+                socket = io(serverUrl, { 
+                    transports: ['websocket', 'polling'],
+                    timeout: 20000,
+                    auth: { fid: fid }
+                });
+
+                socket.on('connect', function() {
+                    updateStatus('Connected!', 'connected');
+                    updateButtons(true);
+                    log('✅ Socket.IO connection established successfully!', 'success');
+                    log('Socket ID: ' + socket.id, 'info');
+                });
+
+                socket.on('disconnect', function(reason) {
+                    updateStatus('Disconnected', 'disconnected');
+                    updateButtons(false);
+                    log('❌ Socket.IO disconnected. Reason: ' + reason, 'error');
+                });
+
+                socket.on('connect_error', function(error) {
+                    updateStatus('Connection Error', 'error');
+                    log('❌ Socket.IO connection error: ' + error.message, 'error');
+                    console.error('Socket.IO error details:', error);
+                });
+
+                // Listen for game events
+                socket.on('gameState', function(data) {
+                    log('🎮 Received gameState: ' + JSON.stringify(data), 'success');
+                });
+
+                socket.on('userInfo', function(data) {
+                    log('👤 Received userInfo: ' + JSON.stringify(data), 'success');
+                });
+
+                socket.on('lobbyTimer', function(timeLeft) {
+                    log('⏰ Lobby timer: ' + timeLeft + ' seconds', 'info');
+                });
+
+                socket.on('cardDrawn', function(data) {
+                    log('🃏 Card drawn: ' + JSON.stringify(data), 'success');
+                });
+
+                socket.on('gameComplete', function(data) {
+                    log('🏁 Game complete: ' + JSON.stringify(data), 'success');
+                });
+
+                socket.on('betAccepted', function(data) {
+                    log('✅ Bet accepted: ' + JSON.stringify(data), 'success');
+                });
+
+                socket.on('betUpdate', function(data) {
+                    log('📊 Bet update: ' + JSON.stringify(data), 'info');
+                });
+
+                socket.on('chipsUpdate', function(data) {
+                    log('💰 Chips update: ' + JSON.stringify(data), 'success');
+                });
+
+                socket.on('gameError', function(error) {
+                    log('❌ Game error: ' + error, 'error');
+                });
+
+                socket.on('pong', function() {
+                    log('🏓 Received pong', 'info');
+                });
+
+            } catch (error) {
+                updateStatus('Connection Failed', 'error');
+                log('❌ Failed to create Socket.IO connection: ' + error.message, 'error');
+            }
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                updateStatus('Disconnected', 'disconnected');
+                updateButtons(false);
+                log('🔌 Disconnected by user', 'info');
+            }
+        }
+
+        function sendMessage() {
+            if (socket && socket.connected) {
+                const message = document.getElementById('messageInput').value;
+                socket.emit('ping');
+                log('📤 Sent ping', 'success');
+            } else {
+                log('❌ Cannot send message - not connected', 'error');
+            }
+        }
+
+        function testConnection() {
+            if (socket && socket.connected) {
+                // Send a test message
+                socket.emit('ping');
+                log('🧪 Sent ping test', 'success');
+                
+                // Request user info
+                socket.emit('requestUserInfo');
+                log('👤 Requested user info', 'info');
+            } else {
+                log('❌ Cannot send test message - not connected', 'error');
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Auto-connect on page load
+        window.onload = function() {
+            log('🚀 Socket.IO test page loaded', 'info');
+            log('Enter a FID and click "Connect" to test the connection', 'info');
+        };
+    </script>
+</body>
+</html> 
